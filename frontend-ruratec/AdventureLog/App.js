@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 
 // Importación de pantallas
+import VerificarDocumentoScreen from "./src/screens/VerificarDocumentoScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import CameraScreen from "./src/screens/CameraScreen";
@@ -132,6 +133,11 @@ export default function App() {
               <Stack.Screen
                 name="EsperandoPago"
                 component={EsperandoPagoScreen}
+              />
+              <Stack.Screen
+                name="VerificarDocumento"
+                component={VerificarDocumentoScreen}
+                options={{ headerShown: false }}
               />
 
             </Stack.Navigator>

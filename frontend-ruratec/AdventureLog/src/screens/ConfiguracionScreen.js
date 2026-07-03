@@ -1,78 +1,71 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, StatusBar, Switch, Alert, Linking,
+  SafeAreaView, StatusBar, Switch, Alert, Modal,
 } from "react-native";
 import {
-  Bell, Moon, Globe, Camera, Image, MapPin,
-  Info, ChevronRight, Shield, Check, X,
+  Bell, Moon, Info, ChevronRight, Shield,
 } from "lucide-react-native";
-import * as ImagePicker from "expo-image-picker";
-import * as Location from "expo-location";
-import { useCameraPermissions } from "expo-camera";
 import { useIdioma } from "../context/IdiomaContext";
 import { useTema } from "../context/ThemeContext";
 
+const TERMINOS_TEXTO = `TÉRMINOS Y CONDICIONES DE USO DE LA PLATAFORMA "RURATEC"
+Última actualización: Julio de 2026
+
+El presente documento establece los Términos y Condiciones que regulan el acceso y uso de la aplicación móvil Ruratec (en adelante, "la Plataforma"). Al registrarse y utilizar la Plataforma, el usuario (en adelante, "el Usuario", que incluye a Agricultores, Comerciantes y/o Transportistas) acepta de manera expresa, voluntaria e irrevocable la totalidad de las cláusulas aquí descritas.
+
+1. NATURALEZA DE LA PLATAFORMA (¿Qué es Ruratec?)
+Ruratec es una plataforma tecnológica de intermediación comercial y optimización logística. La Plataforma no es dueña, no comercializa, no produce ni transporta directamente ningún producto agrícola. Su función se limita a conectar a productores agrícolas (Agricultores) con compradores mayoristas (Comerciantes) y facilitar la coordinación del traslado de mercancías.
+
+2. ROLES Y REGISTRO DE USUARIOS
+Para operar en Ruratec, los usuarios deben registrarse bajo uno de los siguientes perfiles, garantizando que la información suministrada es verídica y actualizada:
+
+Agricultor (Vendedor): Persona natural o jurídica que oferta productos del campo, obligándose a describir con exactitud la calidad, cantidad, empaque y condiciones logísticas de su cosecha.
+
+Comerciante (Comprador): Persona natural o jurídica que adquiere los productos y se compromete al pago oportuno según los términos pactados en la Plataforma.
+
+Transportista (Tercero Colaborador, si aplica): Persona que ofrece servicios de carga pesada o mediana para el traslado de los productos.
+
+3. DECLARACIÓN DE RESPONSABILIDAD LOGÍSTICA Y TRANSPORTE
+Dado que la logística es un factor crítico en la cadena de suministro, las partes aceptan las siguientes reglas al momento de publicar y pactar una compraventa:
+
+Veracidad en los Datos de Acceso: El Agricultor es el único responsable de especificar correctamente en el formulario de publicación las condiciones de recolección (Retiro en finca, Entrega en cabecera municipal o Transporte propio), así como el estado real de las vías de acceso (Trocha, Destapada o Pavimentada).
+
+Exclusión de Responsabilidad por Pérdida de Carga: Ruratec no se hace responsable por el deterioro, pérdida, hurto, retrasos por factores climáticos, paros viales o daños que sufran los productos agrícolas durante el trayecto de transporte. Dicha responsabilidad recae exclusivamente en el transportista contratado o en la parte que asumió la obligación logística según la modalidad elegida en la publicación.
+
+Capacidad del Vehículo: Es responsabilidad del Comerciante (o del Transportista asignado) verificar que el vehículo enviado cumpla con las especificaciones técnicas requeridas para el tipo de vía reportado por el Agricultor y el volumen de carga.
+
+4. MODELO ECONÓMICO Y COMISIONES
+Tarifa por Uso del Servicio: El uso de la Plataforma y la publicación de productos es gratuito. Sin embargo, Ruratec percibirá una tarifa de gestión/comisión del [Insertar % o tarifa fija por transacción, ej: 1% o cobro fijo por flete coordinado] sobre el valor total de cada transacción exitosa, destinada al mantenimiento técnico, geolocalización y soporte de la app.
+
+Independencia de Precios: Los precios de los productos agrícolas son fijados libremente por el Agricultor. Los costos de envío y fletes se calcularán de mutuo acuerdo o mediante las herramientas de estimación de la app, y se desglosarán de forma independiente al valor del producto.
+
+5. CALIDAD DE LOS PRODUCTOS Y DERECHO DE RETRACTO
+Naturaleza Perecedera: De conformidad con el artículo 47 de la Ley 1480 de 2011 (Estatuto del Consumidor de Colombia), los bienes perecederos (frutas, verduras, tubérculos, etc.) están exceptuados del derecho de retracto una vez hayan salido del punto de acopio o finca, debido a su rápida descomposición.
+
+Inspección en el Punto de Entrega: El Comerciante (o el Transportista en su representación) tiene la obligación de inspeccionar la calidad y cantidad del producto en el momento exacto de la recolección. Una vez el producto sea cargado en el vehículo, se entenderá por aceptado a satisfacción, y no se admitirán reclamaciones posteriores por daños estéticos o maduración natural.
+
+6. PROPIEDAD INTELECTUAL
+El diseño, código fuente, logotipos, bases de datos y la marca Ruratec son propiedad exclusiva de sus desarrolladores. Queda prohibida la reproducción total o parcial, ingeniería inversa o explotación comercial del software sin autorización previa y por escrito.
+
+7. TRATAMIENTO DE DATOS PERSONALES (Habeas Data)
+En cumplimiento de la Ley 1581 de 2012 de Colombia, Ruratec recolecta y almacena los datos personales de los usuarios (nombres, teléfonos, ubicaciones GPS, datos de facturación) únicamente con fines de operación de la plataforma, validación de seguridad y conexión entre las partes para la entrega de pedidos. Los datos jamás serán vendidos a terceros.
+
+8. LEY APLICABLE Y JURISDICCIÓN
+Estos Términos y Condiciones se rigen bajo las leyes de la República de Colombia. Cualquier disputa derivada del uso de la plataforma que no pueda ser conciliada directamente de forma amistosa, será sometida a los centros de conciliación autorizados o a la Superintendencia de Industria y Comercio (SIC).`;
+
 const ConfiguracionScreen = ({ navigation }) => {
-  const { idioma, cambiarIdioma, t } = useIdioma();
+  const { t } = useIdioma();
   const { temaOscuro, setTemaOscuro, tema } = useTema();
   const [notificaciones, setNotificaciones] = useState(true);
-  const [permisos, setPermisos] = useState({ camara: null, galeria: null, ubicacion: null });
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-
-  useEffect(() => { verificarPermisos(); }, []);
-
-  const verificarPermisos = async () => {
-    const galeria = await ImagePicker.getMediaLibraryPermissionsAsync();
-    const ubicacion = await Location.getForegroundPermissionsAsync();
-    setPermisos({
-      camara: cameraPermission?.granted ?? false,
-      galeria: galeria.status === "granted",
-      ubicacion: ubicacion.status === "granted",
-    });
-  };
-
-  const solicitarPermiso = async (tipo) => {
-    let result;
-    if (tipo === "camara") {
-      result = await requestCameraPermission();
-      setPermisos((prev) => ({ ...prev, camara: result.granted }));
-    } else if (tipo === "galeria") {
-      result = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      setPermisos((prev) => ({ ...prev, galeria: result.status === "granted" }));
-    } else if (tipo === "ubicacion") {
-      result = await Location.requestForegroundPermissionsAsync();
-      setPermisos((prev) => ({ ...prev, ubicacion: result.status === "granted" }));
-    }
-    if (result?.status === "denied" || result?.granted === false) {
-      Alert.alert("Permiso denegado", "Para habilitarlo ve a Configuración del dispositivo.", [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Abrir Configuración", onPress: () => Linking.openSettings() },
-      ]);
-    }
-  };
+  const [showTerminos, setShowTerminos] = useState(false);
 
   const s = estilos(tema);
-
-  const PermisoItem = ({ icono, label, tipo, valor }) => (
-    <TouchableOpacity style={s.permisoItem} onPress={() => !valor && solicitarPermiso(tipo)}>
-      <View style={s.itemLeft}>
-        <View style={[s.iconBox, { backgroundColor: tema.fondo }]}>{icono}</View>
-        <Text style={s.itemLabel}>{label}</Text>
-      </View>
-      <View style={[s.permisoBadge, valor ? s.permisoOk : s.permisoDenegado]}>
-        {valor ? <Check size={14} color="#fff" /> : <X size={14} color="#fff" />}
-        <Text style={s.permisoText}>{valor ? t.permitido : t.denegar}</Text>
-      </View>
-    </TouchableOpacity>
-  );
 
   return (
     <SafeAreaView style={s.container}>
       <StatusBar barStyle={tema.statusBar} />
-      <View style={s.header}>
-        <Text style={s.headerTitle}>{t.configuracion}</Text>
-      </View>
+      
       <ScrollView contentContainerStyle={s.content}>
 
         {/* Notificaciones */}
@@ -118,15 +111,6 @@ const ConfiguracionScreen = ({ navigation }) => {
             />
           </View>
         </View>
-        {/* Permisos */}
-        <Text style={s.seccionTitulo}>{t.permisosApp}</Text>
-        <View style={s.card}>
-          <PermisoItem icono={<Camera size={20} color={tema.iconoVerde} />} label={t.camara} tipo="camara" valor={permisos.camara} />
-          <View style={s.separador} />
-          <PermisoItem icono={<Image size={20} color={tema.iconoVerde} />} label={t.galeria} tipo="galeria" valor={permisos.galeria} />
-          <View style={s.separador} />
-          <PermisoItem icono={<MapPin size={20} color={tema.iconoVerde} />} label={t.ubicacion} tipo="ubicacion" valor={permisos.ubicacion} />
-        </View>
 
         {/* Acerca de */}
         <Text style={s.seccionTitulo}>{t.acercaDe}</Text>
@@ -145,7 +129,7 @@ const ConfiguracionScreen = ({ navigation }) => {
           <View style={s.separador} />
           <TouchableOpacity
             style={s.rowItem}
-            onPress={() => Alert.alert("Ruratec", "Plataforma que conecta agricultores con comerciantes eliminando intermediarios.\n\n© 2025 Ruratec")}
+            onPress={() => setShowTerminos(true)}
           >
             <View style={s.itemLeft}>
               <View style={[s.iconBox, { backgroundColor: tema.fondo }]}>
@@ -162,6 +146,31 @@ const ConfiguracionScreen = ({ navigation }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Modal con términos y condiciones completos */}
+      <Modal visible={showTerminos} transparent animationType="slide">
+        <View style={s.modalBackdrop}>
+          {/* ✅ FIX: se agregó flex: 0.85 (mismo patrón que ya funciona en
+              RegistroScreen). Un View dentro de un Modal con solo
+              maxHeight en porcentaje puede colapsar a altura 0 en
+              Android antes de medir el contenido, dejando el
+              ScrollView de adentro sin espacio real para pintar texto.
+              Con flex + maxHeight combinados, el modal sí toma una
+              altura concreta desde el primer render. */}
+          <View style={[s.modalContent, { flex: 0.85 }]}>
+            <Text style={s.modalTitle}>Términos y condiciones</Text>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+              <Text style={s.terminosContenido}>{TERMINOS_TEXTO}</Text>
+            </ScrollView>
+            <TouchableOpacity
+              style={s.modalCerrarBtn}
+              onPress={() => setShowTerminos(false)}
+            >
+              <Text style={s.modalCerrarText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -188,11 +197,22 @@ const estilos = (tema) => StyleSheet.create({
   itemLabel: { fontSize: 15, color: tema.texto, fontWeight: "600" },
   itemSub: { fontSize: 12, color: tema.textoSecundario, marginTop: 2 },
   separador: { height: 1, backgroundColor: tema.separador },
-  permisoItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14 },
-  permisoBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  permisoOk: { backgroundColor: "#709742" },
-  permisoDenegado: { backgroundColor: "#e74c3c" },
-  permisoText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+
+  modalBackdrop: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center", alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#fff", width: "90%", maxHeight: "80%",
+    borderRadius: 16, padding: 20,
+  },
+  modalTitle: { fontSize: 18, fontWeight: "bold", color: "#1B3A1B", marginBottom: 14 },
+  terminosContenido: { fontSize: 14, color: "#555", lineHeight: 22 },
+  modalCerrarBtn: {
+    backgroundColor: "#709742", borderRadius: 12,
+    paddingVertical: 12, alignItems: "center", marginTop: 16,
+  },
+  modalCerrarText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
 });
 
 export default ConfiguracionScreen;

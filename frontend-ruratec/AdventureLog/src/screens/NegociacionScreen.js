@@ -24,17 +24,15 @@ const NegociacionScreen = ({ route, navigation }) => {
   const { tema } = useTema();
   const s = estilos(tema);
   const cantidadNum = parseFloat(cantidad.replace(/,/g, ".")) || 0;
-  // ✅ Ahora 'cantidad' y 'precio' siempre hablan de la misma unidad
-  // (item.unidad), así que este cálculo ya es matemáticamente correcto
-  // sin importar si el agricultor publicó en kg, bultos, arrobas, etc.
   const total = cantidadNum * item.precio;
 
-  // Peso total aproximado en kg de lo que el comerciante está pidiendo,
-  // solo si la publicación tiene registrado el peso por unidad.
   const pesoTotalKg =
     item.peso_kg_unidad && cantidadNum > 0
       ? (parseFloat(item.peso_kg_unidad) * cantidadNum).toLocaleString("es-CO", { maximumFractionDigits: 1 })
       : null;
+
+  const cantidadMinima = item.cantidad_minima ? parseFloat(item.cantidad_minima) : null;
+  const bajoMinimo = cantidadNum > 0 && cantidadMinima !== null && cantidadNum < cantidadMinima;
 
   const handleCantidad = (v) => {
     const limpio = v.replace(/[^0-9.,]/g, "").replace(",", ".");
@@ -52,6 +50,12 @@ const NegociacionScreen = ({ route, navigation }) => {
       return Alert.alert(
         "Stock insuficiente",
         `El agricultor solo tiene ${item.stock} ${item.unidad} disponibles`,
+      );
+    }
+    if (bajoMinimo) {
+      return Alert.alert(
+        "Cantidad insuficiente",
+        `El agricultor definió una compra mínima de ${cantidadMinima} ${item.unidad}`,
       );
     }
 
@@ -77,8 +81,18 @@ const NegociacionScreen = ({ route, navigation }) => {
 
       if (response.ok) {
         navigation.replace("EsperandoPago", { negociacion: data, item });
+      } else if (response.status === 403 && data.error?.includes("verificar tu documento")) {
+        // ✅ NUEVO: el backend bloquea negociar sin documento validado
+        Alert.alert(
+          "Verifica tu cuenta",
+          "Necesitas validar tu documento de identidad antes de poder negociar.",
+          [
+            { text: "Cancelar", style: "cancel" },
+            { text: "Verificar ahora", onPress: () => navigation.navigate("VerificarDocumento") },
+          ]
+        );
       } else {
-        Alert.alert("Error", "No se pudo crear la negociación");
+        Alert.alert("Error", data.error || "No se pudo crear la negociación");
       }
     } catch (error) {
       console.error(error);
@@ -122,6 +136,14 @@ const NegociacionScreen = ({ route, navigation }) => {
                 {item.stock} {item.unidad}
               </Text>
             </View>
+            {cantidadMinima !== null && (
+              <View style={s.precioRow}>
+                <Text style={s.precioLabel}>Compra mínima:</Text>
+                <Text style={s.precioValor}>
+                  {cantidadMinima} {item.unidad}
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={s.inputGroup}>
@@ -132,7 +154,11 @@ const NegociacionScreen = ({ route, navigation }) => {
               <Box size={20} color="#709742" />
               <TextInput
                 style={s.input}
-                placeholder={`Máx: ${item.stock} ${item.unidad}`}
+                placeholder={
+                  cantidadMinima !== null
+                    ? `Mín: ${cantidadMinima} · Máx: ${item.stock} ${item.unidad}`
+                    : `Máx: ${item.stock} ${item.unidad}`
+                }
                 value={cantidad}
                 onChangeText={handleCantidad}
                 keyboardType="decimal-pad"
@@ -144,12 +170,17 @@ const NegociacionScreen = ({ route, navigation }) => {
                 ⚠️ Superas el stock disponible ({item.stock} {item.unidad})
               </Text>
             )}
-            {pesoTotalKg && cantidadNum <= item.stock && (
+            {bajoMinimo && (
+              <Text style={s.errorText}>
+                ⚠️ La compra mínima para esta publicación es {cantidadMinima} {item.unidad}
+              </Text>
+            )}
+            {pesoTotalKg && cantidadNum <= item.stock && !bajoMinimo && (
               <Text style={s.pesoText}>≈ {pesoTotalKg} kg en total</Text>
             )}
           </View>
 
-          {cantidadNum > 0 && cantidadNum <= item.stock ? (
+          {cantidadNum > 0 && cantidadNum <= item.stock && !bajoMinimo ? (
             <View style={s.totalCard}>
               <Text style={s.totalLabel}>Total a pagar:</Text>
               <Text style={s.totalValor}>
@@ -165,12 +196,12 @@ const NegociacionScreen = ({ route, navigation }) => {
           <TouchableOpacity
             style={[
               s.btn,
-              (loading || cantidadNum > item.stock || cantidadNum <= 0) && {
+              (loading || cantidadNum > item.stock || cantidadNum <= 0 || bajoMinimo) && {
                 opacity: 0.5,
               },
             ]}
             onPress={handleNegociar}
-            disabled={loading || cantidadNum > item.stock || cantidadNum <= 0}
+            disabled={loading || cantidadNum > item.stock || cantidadNum <= 0 || bajoMinimo}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />

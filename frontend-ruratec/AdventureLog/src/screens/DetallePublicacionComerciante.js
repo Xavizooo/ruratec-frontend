@@ -13,6 +13,25 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../config";
 import { useTema } from "../context/ThemeContext";
 
+// ─── MAPA CAPACIDAD DE ENTREGA → TEXTO/EMOJI ─────────────────────────────────
+const ENTREGA_INFO = {
+  retiro_finca: {
+    emoji: "🏡",
+    titulo: "Solo retiro en finca",
+    descripcion: "El comerciante debe enviar su transporte a recoger el producto.",
+  },
+  casco_urbano: {
+    emoji: "🛵",
+    titulo: "Lleva al casco urbano",
+    descripcion: "El agricultor acerca el producto al municipio más cercano.",
+  },
+  transporte_propio: {
+    emoji: "🚛",
+    titulo: "Transporte propio al destino",
+    descripcion: "El agricultor entrega directamente en tu ciudad o plaza (flete aparte).",
+  },
+};
+
 const DetallePublicacionComerciante = ({ route, navigation }) => {
   const { item } = route.params;
   const insets = useSafeAreaInsets();
@@ -46,10 +65,18 @@ const DetallePublicacionComerciante = ({ route, navigation }) => {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) return;
+
       const response = await fetch(
         `${API_URL}/publicaciones/${item.id}/negociacion-activa/`,
         { headers: { Authorization: `Token ${token}` } }
       );
+
+      const contentType = response.headers.get("content-type");
+      if (!response.ok || !contentType?.includes("application/json")) {
+        console.warn(`Respuesta no válida: status=${response.status}`);
+        return;
+      }
+
       const data = await response.json();
       if (data.activa && data.negociacion) {
         const estado = data.negociacion.estado;
@@ -128,6 +155,11 @@ const DetallePublicacionComerciante = ({ route, navigation }) => {
       ? (parseFloat(item.peso_kg_unidad) * item.stock).toLocaleString("es-CO", { maximumFractionDigits: 1 })
       : null;
 
+  const cantidadMinima = item.cantidad_minima ? parseFloat(item.cantidad_minima) : null;
+
+  // ✅ Info de entrega
+  const entregaInfo = item.capacidad_entrega ? ENTREGA_INFO[item.capacidad_entrega] : null;
+
   if (checkingPendiente) {
     return (
       <SafeAreaView style={[s.container, { justifyContent: "center", alignItems: "center" }]}>
@@ -167,15 +199,25 @@ const DetallePublicacionComerciante = ({ route, navigation }) => {
             </View>
           </View>
 
+          {/* ✅ BADGE DE CAPACIDAD DE ENTREGA — resaltado en amarillo */}
+          {entregaInfo && (
+            <View style={s.entregaBadge}>
+              <View style={s.entregaHeader}>
+                <Text style={s.entregaEmoji}>{entregaInfo.emoji}</Text>
+                <Text style={s.entregaTitulo}>{entregaInfo.titulo}</Text>
+              </View>
+              <Text style={s.entregaDescripcion}>{entregaInfo.descripcion}</Text>
+            </View>
+          )}
+
           <View style={s.detailsGrid}>
             <View style={s.detailItem}>
               <Box size={20} color={tema.iconoVerde} />
               <View>
                 <Text style={s.detailLabel}>Stock disponible</Text>
                 <Text style={s.detailValue}>{item.stock ? `${item.stock.toLocaleString()} ${item.unidad || ""}` : "No especificado"}</Text>
-                {pesoTotalKg && (
-                  <Text style={s.detailSub}>≈ {pesoTotalKg} kg en total</Text>
-                )}
+                {pesoTotalKg && <Text style={s.detailSub}>≈ {pesoTotalKg} kg en total</Text>}
+                {cantidadMinima !== null && <Text style={s.detailSub}>Compra mínima: {cantidadMinima} {item.unidad}</Text>}
               </View>
             </View>
             <View style={s.detailItem}>
@@ -209,14 +251,6 @@ const DetallePublicacionComerciante = ({ route, navigation }) => {
             </View>
           </View>
 
-          <View style={s.logisticCard}>
-            <View style={s.logisticHeader}>
-              <Truck size={22} color="#fff" />
-              <Text style={s.logisticTitle}>Condiciones Logísticas</Text>
-            </View>
-            <Text style={s.logisticText}>Retiro en finca o transporte a convenir con el productor.</Text>
-          </View>
-
           <View style={{ height: 100 }} />
         </View>
       </ScrollView>
@@ -246,12 +280,27 @@ const estilos = (tema) => StyleSheet.create({
   backBtn: { position: "absolute", top: 20, left: 20, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 20, padding: 8 },
   favBtn: { position: "absolute", top: 20, right: 20, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 20, padding: 8 },
   infoContent: { padding: 20, marginTop: -30, backgroundColor: tema.card, borderTopLeftRadius: 30, borderTopRightRadius: 30 },
-  headerSection: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 25 },
+  headerSection: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
   productTitle: { fontSize: 28, fontWeight: "bold", color: tema.textoTitulo },
   farmerSub: { fontSize: 14, color: tema.textoSecundario, marginTop: 4 },
   priceBadge: { backgroundColor: tema.fondo, padding: 12, borderRadius: 15, alignItems: "center" },
   priceValue: { fontSize: 22, fontWeight: "bold", color: tema.iconoVerde },
   priceUnit: { fontSize: 12, color: tema.iconoVerde, fontWeight: "600" },
+
+  // ✅ Estilos badge entrega amarillo
+  entregaBadge: {
+    backgroundColor: "#FFFBEB",
+    borderWidth: 2,
+    borderColor: "#F59E0B",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 20,
+  },
+  entregaHeader: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
+  entregaEmoji: { fontSize: 20, marginRight: 8 },
+  entregaTitulo: { fontSize: 15, fontWeight: "bold", color: "#B45309" },
+  entregaDescripcion: { fontSize: 13, color: "#92400E", lineHeight: 18 },
+
   detailsGrid: { flexDirection: "row", flexWrap: "wrap", marginBottom: 25 },
   detailItem: { width: "50%", flexDirection: "row", alignItems: "flex-start", marginBottom: 20, gap: 10 },
   detailLabel: { fontSize: 12, color: tema.textoSecundario, fontWeight: "600" },
@@ -261,10 +310,6 @@ const estilos = (tema) => StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "bold", color: tema.textoTitulo, marginBottom: 10 },
   infoRow: { flexDirection: "row", gap: 10, alignItems: "center" },
   infoPara: { fontSize: 14, color: tema.textoSecundario, lineHeight: 20, flex: 1 },
-  logisticCard: { backgroundColor: "#709742", padding: 18, borderRadius: 20 },
-  logisticHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
-  logisticTitle: { fontSize: 16, fontWeight: "bold", color: "#fff" },
-  logisticText: { fontSize: 14, color: "#E0F0D5", lineHeight: 20 },
   footerActions: { position: "absolute", bottom: 0, width: "100%", padding: 20, flexDirection: "row", gap: 10, backgroundColor: tema.card, borderTopWidth: 1, borderTopColor: tema.borde },
   actionBtn: { height: 55, borderRadius: 15, justifyContent: "center", alignItems: "center", flexDirection: "row", gap: 10 },
   callBtn: { width: 55, borderWidth: 1, borderColor: tema.iconoVerde },

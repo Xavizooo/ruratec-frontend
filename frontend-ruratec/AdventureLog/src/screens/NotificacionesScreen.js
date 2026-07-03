@@ -135,7 +135,58 @@ const NotificacionesScreen = ({ navigation }) => {
     }
   };
 
+  // Los botones "Aceptar"/"Rechazar" de las notificaciones de negociación
+  // llaman a PUT /negociaciones/<pk>/responder/ con { accion: "aceptar" | "rechazar" }.
+  const responderDesdeNotif = async (negociacionId, accion, notifId) => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      const response = await fetch(
+        `${API_URL}/negociaciones/${negociacionId}/responder/`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ accion }),
+        }
+      );
 
+      if (response.ok) {
+        // ✅ FIX: antes solo se ponía negociacion_id en null, pero la
+        // condición que muestra los botones (esNegociacionPendiente)
+        // comparaba negociacion_estado contra 'pendiente_agricultor',
+        // así que hacía falta actualizar también ese campo en el estado
+        // local para reflejar de inmediato que ya se respondió. Además,
+        // como ahora el backend también marca la notificación original
+        // como leída y guarda el nuevo estado, al recargar la pantalla
+        // (por ejemplo al salir y volver a entrar) el dato persiste y
+        // los botones ya no "revivan".
+        setNotificaciones((prev) =>
+          prev.map((n) =>
+            n.id === notifId
+              ? {
+                  ...n,
+                  leida: true,
+                  negociacion_estado:
+                    accion === "aceptar" ? "aceptado" : "rechazado",
+                }
+              : n
+          )
+        );
+        Alert.alert(
+          "Listo",
+          accion === "aceptar" ? "Negociación aceptada" : "Negociación rechazada"
+        );
+      } else {
+        const data = await response.json();
+        Alert.alert("Error", data.error || "No se pudo responder la negociación");
+      }
+    } catch (error) {
+      console.error("Error respondiendo negociación:", error);
+      Alert.alert("Error de conexión", "Verifica que el servidor esté corriendo");
+    }
+  };
 
   const handlePresionar = async (notif) => {
   if (!notif.leida) await marcarLeida(notif.id);
@@ -173,11 +224,17 @@ const NotificacionesScreen = ({ navigation }) => {
   const noLeidas = notificaciones.filter((n) => !n.leida).length;
 
   const renderNotif = ({ item }) => {
+    // ✅ FIX: antes solo se chequeaba que existiera negociacion_id, lo cual
+    // nunca cambiaba aunque el agricultor ya hubiera respondido. Ahora se
+    // exige además que el estado real de la negociación (que viene del
+    // backend en negociacion_estado) siga siendo 'pendiente_agricultor'.
+    // Así, apenas se acepta o rechaza, los botones desaparecen para siempre,
+    // incluso si se recarga la pantalla desde cero.
     const esNegociacionPendiente =
       rol === "Agricultor" &&
       item.tipo === "negociacion" &&
       item.negociacion_id &&
-      !item.leida;
+      item.negociacion_estado === "pendiente_agricultor";
 
     return (
       <TouchableOpacity
@@ -201,7 +258,7 @@ const NotificacionesScreen = ({ navigation }) => {
             })}
           </Text>
 
-          {/* ✅ Botones de aceptar/rechazar inline para el agricultor */}
+          {/* Botones de aceptar/rechazar inline para el agricultor */}
           {esNegociacionPendiente && (
             <View style={s.botonesRow}>
               <TouchableOpacity
@@ -342,7 +399,6 @@ const estilos = (tema) =>
     },
     mensaje: { fontSize: 13, color: "#555", lineHeight: 18, marginBottom: 5 },
     fecha: { fontSize: 11, color: "#999", marginBottom: 8 },
-    // ✅ Botones
     botonesRow: { flexDirection: "row", gap: 8, marginTop: 4 },
     btn: {
       flex: 1,
